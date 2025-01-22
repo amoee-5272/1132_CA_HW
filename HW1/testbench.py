@@ -1,7 +1,14 @@
 import subprocess
 import re
 
-def T(n):
+# ================== Testbench Script ==================
+# Put this file in the same folder as the Ripes.exe
+# Modify the filename and input to test the script
+# ======================================================
+
+
+
+def T(n): # Calculate global answer
     # Base cases
     if n == 0:
         return 4
@@ -12,22 +19,18 @@ def grade_script(command, correct_answer):
     try:
         
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
-        # print(result)
-        # get output
         output = result.stdout
         print(output)
         
         # find match
-        match = re.search(r"Result is (\d+)", output)
+        match = re.search(r"x5:\s+(\d+)", output)
         
         if match:
             student_answer = int(match.group(1))  # catch answer
             if student_answer == correct_answer:
-                return "==== Correct ^^ ===="
-                # return f"Correct! The answer is {student_answer}. Full score awarded."
+                return f"Correct! The answer is {student_answer}."
             else:
-                return "==== incorrect !! ===="
-                # return f"Incorrect. Your answer: {student_answer}, Expected answer: {correct_answer}."
+                return f"Incorrect. Your answer: {student_answer}, Expected answer: {correct_answer}."
         else:
             return "Error: Could not find a line matching the format 'Result is ?' in the output."
 
@@ -69,14 +72,15 @@ def replace_line_in_file(filename, new_content):
 
 # example usage
 if __name__ == "__main__":
-    # set command here
-    filename = "hw1/hw1_sol_v1.s"  # file name
-    input = 20  # input
+
+    filename = "hw1/hw1_sol_v2.s"  # file path
+    input = 7  # input
+
+
     new_content = f"input: .word {input}"  # replace content
     replace_line_in_file(filename, new_content)
-
-    command_to_run = f"Ripes.exe --mode cli --src {filename} -t asm --proc RV64_5S"  
+    command_to_run = f"Ripes.exe --mode cli --src {filename} -t asm --proc RV64_5S --regs"  
     correct_answer = T(input)  # correct answer
-    print("Answer is",correct_answer)
+    # print("Answer is",correct_answer)
     result = grade_script(command_to_run, correct_answer)
     print(result)
