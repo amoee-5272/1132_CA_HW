@@ -4,8 +4,7 @@
 ### Document
 
 試試看能不能共編
-[https://hackmd.io/@iWmP1H_gSwuc5YgMqmbJFQ/rklreu8DJe/edit](https://hackmd.io/@1OoK2zZxR7aGDTAlxs_nYQ/Bkv-10adJg/edit)
-
+https://hackmd.io/@1OoK2zZxR7aGDTAlxs_nYQ/Bkv-10adJg/edit
 
 ### File explain
 * hw3.py 用 python 跑答案，會根據 data.txt 輸出 answer.txt 和 golden.txt
