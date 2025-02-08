@@ -1,3 +1,4 @@
+
 .data
 input: .word 7
 

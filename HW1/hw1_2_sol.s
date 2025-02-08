@@ -1,5 +1,5 @@
 .data
-nums:   .word 5, 2, 8, 6, 3, 6, 9, 4   # input sequence
+nums:   .word 4, 10, 4, 3, 8, 9, 6, 2   # input sequence
 n:      .word 8                        # sequence length
 dp:     .word 0, 0, 0, 0, 0, 0, 0, 0   # dp array
 
@@ -73,29 +73,26 @@ next_i:
 
 find_max_dp:
     li t3, 0          # i = 0
-    lw t6, 0(t5)      # max_value = dp[0]
+    mv t6, a0         # t6 = n
+    lw a0, 0(t5)      # max_value = dp[0]
 
 find_max_loop:
-    beq t3, a0, exit  # if i == n, end
+    beq t3, t6, exit  # if i == n, end
     slli a3, t3, 2    # offset = i * 4
     add a3, t5, a3    # dp[i] address
     lw a4, 0(a3)      # a4 = dp[i]
-    blt t6, a4, update_max # if dp[i] > max_value, update max_value
+    blt a0, a4, update_max # if dp[i] > max_value, update max_value
     addi t3, t3, 1    # i++
     j find_max_loop   
 
 update_max:
-    mv t6, a4         # max_value = dp[i]
+    mv a0, a4         # max_value = dp[i]
     j find_max_loop   
 
 exit:
-    # answer is store in t6
-    nop
-    # add a0, x0, t6 
-    # li a7, 1
-    # ecall
-    # li a7, 10      
-    # ecall             
-
+	# Exit program
+    # System id for exit is 10 in Ripes, 93 in GEM5 !
+    li a7, 10
+    ecall
 
 
