@@ -1,11 +1,15 @@
 .data
-nums:   .word 4, 10, 4, 3, 8, 9, 6, 2   # input sequence
+nums:   .word 4, 5, 1, 8, 3, 6, 9 ,2   # input sequence
 n:      .word 8                        # sequence length
 dp:     .word 0, 0, 0, 0, 0, 0, 0, 0   # dp array
 
 
 .text
 .globl main
+
+# This is 1132 CA Homework 1 Problem 2
+# Implement Longest Increasing Subsequence Algorithm
+# Output: Length of Longest Increasing Subsequenc in a0(x10)
 
 main:
 

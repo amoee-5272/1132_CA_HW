@@ -1,5 +1,5 @@
 .data
-nums:   .word 4, 10, 4, 3, 8, 9, 6, 2   # input sequence
+nums:   .word 4, 5, 1, 8, 3, 6, 9 ,2   # input sequence
 n:      .word 8                        # sequence length
 dp:     .word 0, 0, 0, 0, 0, 0, 0, 0   # dp array
 
