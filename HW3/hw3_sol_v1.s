@@ -1,129 +1,139 @@
-    .section .data
-N:      .word 3                 # 矩陣總數 N
-matrix_info: 
-    .word 0x0000, 2, 3          # matrix1: 地址=0000, 大小=2x3
-    .word 0x0018, 3, 4          # matrix2: 地址=0018, 大小=3x4
-    .word 0x0050, 4, 2          # matrix3: 地址=0050, 大小=4x2
+.section .text
+.global matrix_chain_multiplication
 
-result_address: 
-    .word 0xf000                # 最終結果存放地址
+# matrix_chain_multiplication:
+# 這個函數執行矩陣鏈乘，返回計算結果的記憶體地址。
+# 參數:
+#   a0 = N (矩陣總數)
+#   a1 = matrix_info (矩陣資訊地址)
+#   a2 = buffer1 (暫存區1)
+#   a3 = buffer2 (暫存區2)
+# 返回:
+#   a0 = 計算結果存放的記憶體地址
 
-buffer1: 
-    .space 65536                # 緩衝區1 (128x128)
+matrix_chain_multiplication:
+    addi sp, sp, -40         # 分配 stack 空間 (-40 以對齊 -8)
+    sd ra, 32(sp)            # 存回 ra (返回地址)
+    sd a0, 24(sp)            # 存回 N (矩陣總數)
+    sd a1, 16(sp)            # 存回 matrix_info 地址
+    sd a2, 8(sp)             # 存回 buffer1
+    sd a3, 0(sp)             # 存回 buffer2
 
-buffer2: 
-    .space 65536                # 緩衝區2 (128x128)
+    beqz a1, return_null     # 如果 matrix_info = NULL，則返回 NULL
 
-    .section .text
-    .globl _start
+    mv t1, a0                # t1 = N (矩陣數量)
+    mv t0, a1                # t0 = matrix_info 地址
+    mv s1, a2                # s1 = buffer1
+    mv s2, a3                # s2 = buffer2
 
-_start:
-    # 初始化
-    la t0, matrix_info          # 獲取矩陣資訊地址
-    lw t1, N                    # 加載矩陣總數
-    la t3, buffer1              # 暫存區1的地址
-    la t4, buffer2              # 暫存區2的地址
-    lw t5, result_address       # 最終結果地址
+    # 讀取 matrix1 資訊
+    ld s3, 0(t0)             # matrix1 的起始地址
+    beqz s3, return_null     # 若地址為 NULL，則返回 NULL
 
-    # 初始矩陣載入到 buffer1
-    lw t6, 0(t0)                # matrix1 地址
-    lw t7, 4(t0)                # matrix1 行數
-    lw t8, 8(t0)                # matrix1 列數
-    addi t0, t0, 12             # 更新到 matrix2
-    jal ra, copy_matrix         # 複製 matrix1 到 buffer1
+    ld s4, 8(t0)             # matrix1 行數
+    ld s5, 16(t0)            # matrix1 列數
+    addi t0, t0, 24          # 移動到 matrix2 的資訊地址
+    mv s6, s1                # 初始計算結果存入 buffer1
 
-    # 矩陣連乘
-    mv t9, t3                   # 暫存區 (計算結果的讀寫切換)
+    jal ra, copy_matrix      # 複製 matrix1 到 buffer1
+
+# 矩陣相乘主迴圈
 matrix_multiply_loop:
-    addi t1, t1, -1             # 矩陣數量減1
-    beqz t1, finalize_result    # 如果矩陣數量為0，跳到結果處理
+    addi t1, t1, -1          # N = N - 1，檢查是否計算完所有矩陣
+    beqz t1, finalize_result # 若矩陣數量為 0，則完成計算並返回
 
-    # 加載下一矩陣
-    lw t6, 0(t0)                # matrixX 地址
-    lw t7, 4(t0)                # matrixX 行數
-    lw t8, 8(t0)                # matrixX 列數
-    addi t0, t0, 12             # 更新到下一個矩陣
+    # 讀取下一個矩陣的資訊
+    ld s3, 0(t0)             # matrixX 的地址
+    beqz s3, return_null     # 若地址為 NULL，則返回 NULL
 
-    # 切換緩衝區 (交替使用)
-    beq t9, t3, use_buffer2
-    mv t10, t3                  # 暫存結果存到 buffer1
-    mv t9, t4                   # 下一輪暫存地址切換到 buffer2
-    jal ra, matrix_multiply     # 矩陣相乘
-    j matrix_multiply_loop
+    ld s4, 8(t0)             # matrixX 行數
+    ld s5, 16(t0)            # matrixX 列數
+    addi t0, t0, 24          # 移動到下一個矩陣資訊
+
+    # 交替使用 buffer1 和 buffer2
+    beq s6, s1, use_buffer2  # 如果 s6 是 buffer1，則切換到 buffer2
+    mv s7, s1                # 暫存結果存入 buffer1
+    mv s6, s2                # 下一輪暫存區為 buffer2
+    jal ra, matrix_multiply  # 執行矩陣乘法
+    j matrix_multiply_loop   # 繼續下一輪相乘
 
 use_buffer2:
-    mv t10, t4                  # 暫存結果存到 buffer2
-    mv t9, t3                   # 下一輪暫存地址切換到 buffer1
-    jal ra, matrix_multiply     # 矩陣相乘
-    j matrix_multiply_loop
+    mv s7, s2                # 暫存結果存入 buffer2
+    mv s6, s1                # 下一輪暫存區為 buffer1
+    jal ra, matrix_multiply  # 執行矩陣乘法
+    j matrix_multiply_loop   # 繼續下一輪相乘
 
+# 計算結束，返回結果地址
 finalize_result:
-    # 將最終結果從暫存區複製到 result_address
-    mv t6, t9                   # 暫存區地址
-    lw t7, 4(t0)                # 最終行數
-    lw t8, 8(t0)                # 最終列數
-    jal ra, copy_matrix_to_result
+    mv a0, s6                # 設定 a0 為最終結果存放的記憶體地址
+    ld ra, 32(sp)            # 取回返回地址
+    addi sp, sp, 40          # 釋放 stack 空間
+    ret                      # 返回至 C++ 主程式
 
-    # 結束
-    li a7, 10                   # Exit syscall
-    ecall
+# 若 matrix_info 為 NULL，則返回 NULL
+return_null:
+    li a0, 0                 # 設定返回值為 NULL
+    ld ra, 32(sp)            # 取回返回地址
+    addi sp, sp, 40          # 釋放 stack 空間
+    ret                      # 返回至 C++ 主程式
 
-# 矩陣複製程式
+# 矩陣複製函數
+# 複製 s3 指向的矩陣到 s6 指向的位置
+# s3 = 原始矩陣地址
+# s4 = 行數
+# s5 = 列數
+# s6 = 目標地址
 copy_matrix:
-    # t6: 原始矩陣地址
-    # t7: 行數
-    # t8: 列數
-    # t9: 目標地址
-    mv t11, t7                  # 複製的行數
+    mv s8, s4                # 設定行數
 copy_row:
-    beqz t11, copy_done          # 如果行數為0，結束
-    mv t12, t8                  # 複製的列數
-    copy_column:
-        beqz t12, next_row       # 如果列數為0，進入下一行
-        lw t13, 0(t6)           # 載入數據
-        sw t13, 0(t9)           # 存入目標地址
-        addi t6, t6, 4          # 移動原始地址
-        addi t9, t9, 4          # 移動目標地址
-        addi t12, t12, -1       # 列數減1
-        j copy_column           # 繼續複製列
-    next_row:
-        addi t11, t11, -1       # 行數減1
-        j copy_row              # 繼續複製行
+    beqz s8, copy_done       # 若行數為 0，則結束複製
+    mv s9, s5                # 設定列數
+copy_column:
+    beqz s9, copy_next_row   # 若列數為 0，則進入下一行
+    ld s10, 0(s3)            # 載入數據
+    sd s10, 0(s6)            # 存入目標地址
+    addi s3, s3, 8           # 移動原始矩陣地址 (8-byte 因為 64-bit)
+    addi s6, s6, 8           # 移動目標地址 (8-byte)
+    addi s9, s9, -1          # 列數減 1
+    j copy_column            # 繼續複製下一個元素
+copy_next_row:
+    addi s8, s8, -1          # 行數減 1
+    j copy_row               # 繼續複製下一行
 copy_done:
-    ret
+    ret                      # 返回
 
-# 矩陣相乘程式
+# 矩陣相乘函數
+# s3 = 矩陣 A 的地址
+# s4 = 矩陣 A 的行數
+# s5 = 矩陣 A 的列數 / 矩陣 B 的行數
+# s6 = 矩陣 B 的地址
+# s7 = 暫存區地址 (存結果)
 matrix_multiply:
-    # t6: 矩陣A地址
-    # t7: 矩陣A行數
-    # t8: 矩陣A列數 / 矩陣B行數
-    # t9: 矩陣B地址
-    # t10: 暫存區地址
-    mv t11, t7                  # 矩陣A的行數
+    mv s8, s4                # 設定矩陣 A 的行數
 multiply_row:
-    beqz t11, multiply_done     # 如果行數為0，結束
-    mv t12, t8                  # 矩陣B的列數
-    multiply_column:
-        beqz t12, next_row      # 如果列數為0，進入下一行
-        mv t13, zero            # 初始化結果值
-        mv t14, t8              # 矩陣A的列數 / 矩陣B的行數
-        multiply_element:
-            beqz t14, next_column # 如果結束，進入下一列
-            lw t15, 0(t6)       # 載入A的值
-            lw t16, 0(t9)       # 載入B的值
-            mul t17, t15, t16   # 相乘
-            add t13, t13, t17   # 加到結果
-            addi t6, t6, 4      # 移動到A的下一個元素
-            addi t9, t9, 4      # 移動到B的下一個元素
-            addi t14, t14, -1   # 減少計數器
-            j multiply_element  # 繼續運算
-        next_column:
-            sw t13, 0(t10)      # 存入結果
-            addi t10, t10, 4    # 移動到下一列
-            addi t12, t12, -1   # 列數減1
-            j multiply_column   # 繼續計算列
-    next_row:
-        addi t11, t11, -1       # 行數減1
-        j multiply_row          # 繼續計算行
+    beqz s8, multiply_done   # 若行數為 0，則結束計算
+    mv s9, s5                # 設定矩陣 B 的列數
+multiply_column:
+    beqz s9, next_row        # 若列數為 0，則進入下一行
+    mv s10, zero             # 初始化結果值
+    mv s11, s5               # 設定矩陣 A 的列數 / 矩陣 B 的行數
+multiply_element:
+    beqz s11, next_column    # 若計算完該元素，則進入下一列
+    ld t0, 0(s3)             # 讀取 A 的元素
+    ld t1, 0(s6)             # 讀取 B 的元素
+    mul t2, t0, t1           # 相乘
+    add s10, s10, t2         # 加到結果
+    addi s3, s3, 8           # 移動 A 的指標
+    addi s6, s6, 8           # 移動 B 的指標
+    addi s11, s11, -1        # 迴圈計數減 1
+    j multiply_element       # 繼續計算下一個元素
+next_column:
+    sd s10, 0(s7)            # 存入結果
+    addi s7, s7, 8           # 移動到下一列
+    addi s9, s9, -1          # 列數減 1
+    j multiply_column        # 繼續計算列
+next_row:
+    addi s8, s8, -1          # 行數減 1
+    j multiply_row           # 繼續計算行
 multiply_done:
-    ret
+    ret                      # 返回
