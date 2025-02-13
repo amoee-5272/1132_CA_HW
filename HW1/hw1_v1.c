@@ -11,6 +11,6 @@ int main() {
     int n = 7;
     int result;
     result = T(n);
-    printf("answer = %d\n",result);
+    //printf("answer = %d\n",result);
     return 0;
 }
