@@ -55,6 +55,11 @@ outer_loop:
 inner_loop:
     beq t6, t3, next_i  # if j == i, increment i
 
+    # read nums[i] to a2 
+    slli a3, t3,2     # offset = i * 4
+    add a3, t4, a3    # nums[i] address
+    lw a2, 0(a3)      # a2 = nums[i]
+
     # read nums[j] to a4
     slli a5, t6, 2    # offset = j * 4
     add a5, t4, a5    # nums[j] address
@@ -86,10 +91,6 @@ update_dp:
 next_i:
     addi t3, t3, 1    # i++  
     j outer_loop      
-    # read nums[i] to a2 
-    slli a3, t3,2     # offset = i * 4
-    add a3, t4, a3    # nums[i] address
-    lw a2, 0(a3)      # a2 = nums[i]
 
 find_max_dp:
     li t3, 0          # i = 0
