@@ -1,77 +1,87 @@
-#include <fcntl.h>    // open
-#include <unistd.h>   // read, write, close, ftruncate
-#include <stdlib.h>   // malloc, free, strtol, exit
-#include <stdio.h>    // snprintf
-#include <string.h>   // memcpy
+#include <fcntl.h>      // open
+#include <unistd.h>     // read, write, close, ftruncate
+#include <stdlib.h>     // malloc, free, strtol, exit, strdup
+#include <stdio.h>      // snprintf, fprintf, perror
+#include <string.h>     // memcpy, strlen, strcmp
+#include <sys/stat.h>   // mkdir, mode_t
+#include <sys/types.h>
+#include <errno.h>
+#include <libgen.h>     // dirname
+
+// Helper function: recursively create directories (similar to "mkdir -p").
+int mkpath(const char *dir, mode_t mode) {
+    char tmp[1024];
+    char *p = NULL;
+    size_t len;
+
+    // Copy the directory path to a temporary buffer.
+    snprintf(tmp, sizeof(tmp), "%s", dir);
+    len = strlen(tmp);
+    if (len == 0)
+        return -1;
+    // Remove trailing slash if present.
+    if (tmp[len - 1] == '/')
+        tmp[len - 1] = '\0';
+
+    // Iterate through the path and create each subdirectory.
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, mode) != 0) {
+                if (errno != EEXIST)
+                    return -1;
+            }
+            *p = '/';
+        }
+    }
+    // Create the final directory.
+    if (mkdir(tmp, mode) != 0) {
+        if (errno != EEXIST)
+            return -1;
+    }
+    return 0;
+}
+
+// Create the parent directory of the given filepath.
+int create_parent_directory(const char *filepath) {
+    char *path_copy = strdup(filepath);
+    if (!path_copy)
+        return -1;
+    char *dir = dirname(path_copy);
+    int ret = 0;
+    // If dirname returns "." then there is no directory component.
+    if (strcmp(dir, ".") != 0) {
+        ret = mkpath(dir, 0755);
+    }
+    free(path_copy);
+    return ret;
+}
 
 // The chain_matrix_multiplication function multiplies matrices in order.
-// The parameters are:
-//   - matrices: an array of pointers; each pointer is a matrix stored as a flat int array
-//   - rows: an array of ints giving the number of rows for each matrix
-//   - cols: an array of ints giving the number of columns for each matrix
-//   - count: number of matrices (at least 1)
 // It returns a pointer to a newly allocated matrix which is the result of
 // multiplying matrices[0] x matrices[1] x ... x matrices[count-1].
-
 extern "C" {
-int* chain_matrix_multiplication(int** matrices, int* rows, int* cols, int count);
+    int* chain_matrix_multiplication(int** matrices, int* rows, int* cols, int count);
 }
 
-/*
-extern "C" {
-int* chain_matrix_multiplication(int** matrices, int* rows, int* cols, int count) {
-    // The result begins as a copy of the first matrix.
-    int r = rows[0];
-    int c = cols[0];
-    int* result = (int*) malloc(r * c * sizeof(int));
-    if (!result) return NULL;
-    memcpy(result, matrices[0], r * c * sizeof(int));
-
-    // Multiply (result) by each subsequent matrix.
-    for (int i = 1; i < count; i++) {
-        int r2 = rows[i];   // rows of the new (right-hand) matrix
-        int c2 = cols[i];   // columns of the new matrix
-
-        // Check that the dimensions are valid: result's columns must equal new matrix’s rows.
-        if (c != r2) {
-            free(result);
-            return NULL;  // Dimension mismatch
-        }
-
-        // Allocate memory for the product matrix (dimensions: r x c2).
-        int* product = (int*) malloc(r * c2 * sizeof(int));
-        if (!product) {
-            free(result);
-            return NULL;
-        }
-
-        // Standard triple-loop matrix multiplication.
-        for (int a = 0; a < r; a++) {
-            for (int b = 0; b < c2; b++) {
-                int sum = 0;
-                for (int k = 0; k < c; k++) {
-                    // result is stored as row-major (a * c + k)
-                    // matrices[i] is stored as row-major (k * c2 + b)
-                    sum += result[a * c + k] * matrices[i][k * c2 + b];
-                }
-                product[a * c2 + b] = sum;
-            }
-        }
-        free(result);   // free the old result
-        result = product;
-        c = c2;         // update current column count for next multiplication
-    }
-    return result;
-}
-} // end extern "C"
-*/
-
-// Main function: read input, call chain_matrix_multiplication, and write output.
-int main() {
-    // Open the input file for reading.
-    int fd = open("/workspace/input.txt", O_RDONLY);
-    if (fd < 0)
+int main(int argc, char* argv[]) {
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <input_file_path> <output_file_path>\n", argv[0]);
         return 1;
+    }
+
+    // Ensure the output file's parent directory exists.
+    if (create_parent_directory(argv[2]) != 0) {
+        fprintf(stderr, "Failed to create output directory for %s\n", argv[2]);
+        return 1;
+    }
+
+    // Open the input file for reading using the provided file path.
+    int fd = open(argv[1], O_RDONLY);
+    if (fd < 0) {
+        perror("open input file");
+        return 1;
+    }
 
     // Read the entire input file into a buffer.
     // (Assume the file is not larger than 8192 bytes.)
@@ -164,9 +174,10 @@ int main() {
     int final_rows = rows_arr[0];
     int final_cols = cols_arr[count - 1];
 
-    // Open the output file for writing.
-    int out_fd = open("/workspace/output.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    // Open the output file for writing using the provided file path.
+    int out_fd = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (out_fd < 0) {
+        perror("open output file");
         free(result);
         for (int i = 0; i < count; i++)
             free(matrices[i]);
@@ -178,6 +189,7 @@ int main() {
 
     // Additionally, explicitly truncate the file to zero length.
     if (ftruncate(out_fd, 0) < 0) {
+        perror("ftruncate output file");
         close(out_fd);
         free(result);
         for (int i = 0; i < count; i++)
